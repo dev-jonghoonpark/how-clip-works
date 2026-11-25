@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yannic Kilcher의 CLIP 해설 따라가기 — How CLIP Works</title>
+<meta name="description" content="Yannic Kilcher의 「OpenAI CLIP: Connecting Text and Images (Paper Explained)」 영상을 순서대로 정리한 한국어 노트. 점수 모델에서 제로샷 분류기 만들기, 대조 목적 함수, 분류 사전학습이 개를 한 덩어리로 뭉치는 이유, few-shot 곡선이 먼저 내려가는 이유, 분포 이동 강건성.">
+<style>
+
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb;
+  --page:#f9f9f7;
+  --text-primary:#0b0b0b;
+  --text-secondary:#52514e;
+  --muted:#898781;
+  --grid:#e1e0d9;
+  --axis:#c3c2b7;
+  --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6;
+  --s2:#eb6834;
+  --s3:#1baf7a;
+  --s4:#8b5cf6;
+  --s8:#e34948;
+  --warn:#fab219;
+  --good:#0ca30c;
+  --wash:rgba(42,120,214,0.08);
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19;
+  --page:#0d0d0d;
+  --text-primary:#ffffff;
+  --text-secondary:#c3c2b7;
+  --muted:#898781;
+  --grid:#2c2c2a;
+  --axis:#383835;
+  --border:rgba(255,255,255,0.10);
+  --s1:#3987e5;
+  --s2:#d95926;
+  --s3:#199e70;
+  --s4:#a78bfa;
+  --s8:#e66767;
+  --warn:#fab219;
+  --good:#0ca30c;
+  --wash:rgba(57,135,229,0.14);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+body{
+  margin:0; background:var(--page); color:var(--text-primary);
+  font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:16px; line-height:1.75; letter-spacing:-0.01em;
+}
+.wrap{max-width:880px;margin:0 auto;padding:0 16px 120px}
+header.hero{padding:56px 0 28px;border-bottom:1px solid var(--border);margin-bottom:8px}
+h1{font-size:clamp(28px,5.2vw,42px);line-height:1.25;margin:0 0 12px;letter-spacing:-0.03em}
+.sub{color:var(--text-secondary);font-size:17px;margin:0}
+.kicker{font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 10px}
+h2{font-size:clamp(21px,3.4vw,27px);margin:56px 0 6px;letter-spacing:-0.02em;line-height:1.3}
+h3{font-size:18px;margin:34px 0 6px;letter-spacing:-0.015em}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:22px}
+li{margin:6px 0}
+strong{font-weight:650}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.9em;background:var(--wash);padding:1px 5px;border-radius:4px}
+a{color:var(--s1)}
+.demo{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px;margin:24px 0}
+.demo h4{margin:0 0 2px;font-size:15px;color:var(--text-primary);font-weight:650}
+.demo .cap{color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.6}
+canvas{display:block;width:100%;border-radius:8px;background:var(--surface-1);touch-action:manipulation}
+.ctrls{display:flex;flex-wrap:wrap;gap:14px 22px;margin:14px 0 4px;align-items:flex-end}
+.ctrl{flex:1 1 210px;min-width:170px}
+.ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text-secondary);margin-bottom:4px;gap:10px}
+.ctrl label b{font-variant-numeric:tabular-nums;color:var(--text-primary);font-weight:650;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--s1);height:22px;margin:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+button{font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);transition:background .12s}
+button:hover{background:var(--wash)}
+button[aria-pressed=true]{background:var(--wash);border-color:var(--s1)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--text-secondary);margin:10px 0 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.readout{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:12px;font-size:13px;color:var(--text-secondary)}
+.readout b{display:block;font-size:19px;color:var(--text-primary);font-weight:650;line-height:1.3;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.eq{background:var(--surface-1);border:1px solid var(--border);border-left:3px solid var(--s1);
+  border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0;overflow-x:auto;text-align:center}
+.eq .note{display:block;font-size:12.5px;color:var(--muted);margin:6px 0 0;line-height:1.55;text-align:left}
+.tw{overflow-x:auto;margin:18px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle}
+th{font-weight:650;font-size:12.5px;color:var(--text-secondary);background:var(--page)}
+tr:last-child td{border-bottom:none}
+td.num,th.num{font-variant-numeric:tabular-nums;text-align:right}
+td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.note{border-left:3px solid var(--axis);padding:2px 0 2px 16px;margin:18px 0;color:var(--text-secondary);font-size:14.5px}
+.key{border:1px solid var(--border);border-left:3px solid var(--s2);background:var(--surface-1);
+  border-radius:0 10px 10px 0;padding:14px 18px;margin:20px 0}
+.key .lbl{font-size:11.5px;font-weight:700;letter-spacing:0.1em;color:var(--s2);display:block;margin-bottom:4px}
+.key p{margin:0}
+nav.toc{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin:26px 0}
+nav.toc ol{margin:6px 0 0;padding-left:20px;font-size:14.5px}
+nav.toc a{text-decoration:none;color:var(--text-primary)}
+nav.toc a:hover{color:var(--s1)}
+.q{border:1px solid var(--border);border-radius:10px;background:var(--surface-1);padding:16px 18px;margin:14px 0}
+.q h4{margin:0 0 8px;font-size:15px;color:var(--text-primary)}
+.q .opt{display:flex;gap:9px;align-items:flex-start;padding:7px 10px;border:1px solid var(--border);
+  border-radius:8px;margin:6px 0;cursor:pointer;font-size:14px;transition:border-color .12s}
+.q .opt:hover{border-color:var(--s1)}
+.q .opt input{margin-top:5px;accent-color:var(--s1)}
+.q .opt.correct{border-color:var(--good);background:rgba(12,163,12,0.08)}
+.q .opt.wrong{border-color:var(--s8);background:rgba(227,73,72,0.07)}
+.q .expl{display:none;font-size:13.5px;color:var(--text-secondary);border-left:3px solid var(--good);
+  padding:2px 0 2px 12px;margin-top:10px;line-height:1.65}
+.q .expl.bad{border-left-color:var(--s8)}
+.q .expl.show{display:block}
+.quiz-score{font-size:15px;font-weight:700;margin-top:14px}
+.tog{position:fixed;top:14px;right:14px;z-index:10;border-radius:999px;padding:7px 13px;
+  background:var(--surface-1);border:1px solid var(--border);font-size:12.5px}
+footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+footer a{color:var(--text-secondary)}
+.refs{font-size:13px;color:var(--text-secondary);line-height:1.7}
+.easy{background:var(--surface-1);border:1px solid var(--border);border-left:3px solid var(--s3);border-radius:0 14px 14px 0;padding:18px 20px;margin:24px 0}
+.easy .lbl{font-size:11.5px;font-weight:700;letter-spacing:0.1em;color:var(--s3);display:block;margin-bottom:2px}
+.easy h3{margin:0 0 8px}
+.easy ol{padding-left:20px}
+.easy .big{font-size:17px;text-align:center;margin:10px 0;font-weight:650}
+.sw{display:grid;grid-template-columns:150px 1fr 64px;gap:8px 10px;align-items:center;font-size:13px;margin-top:12px}
+.sw .bar{position:relative;height:18px;background:var(--page);border:1px solid var(--border);border-radius:4px}
+.sw .bar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.sw .bar:after{content:'';position:absolute;left:50%;top:-3px;bottom:-3px;border-left:1px solid var(--axis)}
+.sw b{font-variant-numeric:tabular-nums;text-align:right}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:640px){.split{grid-template-columns:1fr}}
+.split h5{margin:4px 0 0;font-size:13px;color:var(--text-secondary);font-weight:650}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;margin:16px 0;justify-content:center}
+.flow span{border:1px solid var(--border);background:var(--surface-1);border-radius:8px;padding:5px 10px;font-weight:600}
+.flow em{color:var(--muted);font-style:normal}
+sup.fn{font-size:0.72em;line-height:0;margin-left:1px}
+sup.fn a{text-decoration:none;font-weight:700;padding:0 2px}
+.footnotes{margin-top:64px;padding-top:18px;border-top:1px solid var(--border);font-size:14.5px;color:var(--text-secondary)}
+.footnotes h2{font-size:18px;margin:0 0 10px;color:var(--text-primary)}
+.footnotes ol{padding-left:22px}
+.footnotes li:target{background:var(--wash);border-radius:8px}
+.footnotes p{margin:10px 0}
+.footnotes .tw{font-size:13.5px}
+.footnotes .back{text-decoration:none;margin-left:4px}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--wash);color:var(--s1);margin-left:6px;vertical-align:2px}
+
+@media (max-width:640px){.tog{position:absolute}}
+.ax-tp{color:var(--s1)}.ax-cp{color:var(--s4)}.ax-pp{color:var(--s2)}.ax-dp{color:var(--s3)}.ax-ep{color:var(--s8)}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;margin-right:4px}
+svg.fig{display:block;width:100%;height:auto;margin:6px 0}
+svg.fig text{font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;fill:var(--text-primary)}
+svg.fig .m{fill:var(--muted)}
+.gpu{cursor:pointer}
+.info{font-size:13.5px;color:var(--text-secondary);margin-top:10px;line-height:1.7;min-height:3.4em}
+.info b{color:var(--text-primary)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:none;border-radius:0;border-right:1px solid var(--border)}
+.seg button:last-child{border-right:none}
+.mini{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+pre{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px 16px;overflow-x:auto;font-size:13px;line-height:1.6;margin:18px 0}
+#a4tb th,#a4tb td{white-space:nowrap}
+pre code{background:none;padding:0;font-size:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;border:1px solid var(--border);border-radius:6px;padding:3px 8px;background:var(--page)}
+.chip.tok{border-color:var(--s1);background:var(--wash)}
+.chip.ok{border-color:var(--good);background:rgba(12,163,12,0.08)}
+.chip.bad{border-color:var(--s8);background:rgba(227,73,72,0.07)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px;margin:8px 0}
+.row .lab{min-width:118px;color:var(--text-secondary);font-weight:600}
+.trace{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;background:var(--page);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:8px 0;white-space:pre-wrap}
+.trace .w{color:var(--s8)}.trace .g{color:var(--good)}.trace .m{color:var(--muted)}
+.step-box{min-height:150px}
+.stepnav{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--muted)}
+textarea,input[type=text]{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--page);color:var(--text-primary)}
+.big-out{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;font-weight:650;letter-spacing:0.02em;word-break:break-all;margin:6px 0}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary);margin-left:6px;vertical-align:1px}
+.mx td,.mx th{padding:7px 8px;font-size:13px;white-space:nowrap}
+.mx td small{display:block;color:var(--muted);font-size:11px}
+.mx td.dg{background:var(--wash);font-weight:650}
+.z3grid{display:grid;grid-template-columns:150px 1fr;gap:18px;margin-top:12px;align-items:start}
+@media (max-width:560px){.z3grid{grid-template-columns:1fr}.z3grid canvas{max-width:150px}}
+.zb{display:grid;grid-template-columns:92px 1fr 54px 40px;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+.zb .nm.tr{font-weight:700;color:var(--s1)}
+.zb .bar{height:14px;background:var(--page);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.zb .bar i{display:block;height:100%}
+.zb b{font-variant-numeric:tabular-nums;text-align:right}
+.zb .cs{font-variant-numeric:tabular-nums;text-align:right;color:var(--muted);font-size:12px}
+a.ts{font-size:12.5px;font-weight:600;text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:3px;white-space:nowrap;color:var(--s1);background:var(--surface-1);letter-spacing:0}
+a.ts:hover{background:var(--wash)}
+.tsr{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;margin-left:6px}
+.arow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:6px 0}
+.demo .tag,.note .tag{margin-left:0;margin-right:6px}
+</style>
+</head>
+<body>
+<button class="tog" id="themeBtn" type="button">◐ 다크</button>
+<div class="wrap">
+<header class="hero">
+  <p class="kicker">How CLIP Works · 영상 노트</p>
+  <h1>Yannic Kilcher의 CLIP 해설 따라가기</h1>
+  <p class="sub">Yannic Kilcher가 CLIP 공개 직후(2021년 1월)에 올린 48분짜리 논문 해설 「<a href="https://www.youtube.com/watch?v=T9XSU0pKX2E" target="_blank" rel="noopener">OpenAI CLIP: Connecting Text and Images (Paper Explained)</a>」을 영상 순서대로 정리한 노트입니다. <a href="./">본편</a>이 논문의 수치와 수식을 따라간다면, 이 노트는 영상이 주는 <strong>직관</strong>을 모았습니다. 텍스트에 점수를 매길 수 있는 모델이면 무엇이든 분류기가 된다는 것, 분류 사전학습이 왜 "개를 한 덩어리로 뭉치는지", few-shot 곡선이 왜 처음에 내려가는지 같은 설명입니다.</p>
+</header>
+
+<div class="key">
+  <span class="lbl">영상의 한 줄</span>
+  <p><strong>핵심 아이디어는 대조 목적 함수에 큰 배치를 더한 것이고, 그 결과물은 어떤 과제에든 제로샷 분류기로 바꿔 쓸 수 있는 모델이다.</strong> Kilcher는 "제로샷 분류기를 어떻게 만드는가"를 먼저 설명하고, 그 성질은 유지한 채 학습 과제만 텍스트 예측에서 대조로 바꾸는 순서로 풀어 간다.</p>
+</div>
+
+<nav class="toc">
+  <strong>영상 순서 <span class="mini" style="display:inline">(시간을 누르면 해당 지점이 열립니다)</span></strong>
+  <ol>
+    <li><a href="#k1">같은 분류기 하나, 이상하게 긴 라벨</a> <span class="tsr">0:00</span></li>
+    <li><a href="#k2">이미지와 텍스트를 잇는 첫 번째 생각: 텍스트 예측</a> <span class="tsr">4:40</span></li>
+    <li><a href="#k3">점수만 매길 수 있으면 분류기가 된다</a> <span class="tsr">9:00</span></li>
+    <li><a href="#k4">대조 목적 함수: 두 방향에서 본 분류 문제</a> <span class="tsr">14:40</span></li>
+    <li><a href="#k5">왜 분류 사전학습보다 좋은 표현인가</a> <span class="tsr">20:40</span></li>
+    <li><a href="#k6">인코더와 프롬프트 앙상블</a> <span class="tsr">22:25</span></li>
+    <li><a href="#k7">제로샷 CLIP vs ResNet-50 선형 프로브</a> <span class="tsr">25:00</span></li>
+    <li><a href="#k8">제로샷 vs few-shot: 곡선이 먼저 내려가는 이유</a> <span class="tsr">31:50</span></li>
+    <li><a href="#k9">스케일링과 과제별 비교</a> <span class="tsr">35:35</span></li>
+    <li><a href="#k10">분포 이동: 바나나는 노랗다</a> <span class="tsr">37:40</span></li>
+    <li><a href="#k11">사회적 영향 절과 Kilcher의 총평</a> <span class="tsr">44:20</span></li>
+    <li><a href="#k12">확인 퀴즈</a></li>
+  </ol>
+</nav>
+
+<p class="note">영상의 대본을 옮긴 것이 아니라 내용을 요약하고 다시 설명한 것입니다. 논문 수치는 <a href="./">본편</a>에 정리했으므로 여기서는 반복하지 않습니다. 영상의 설명이 논문과 다르거나 영상 이후에 달라진 부분은 <span class="tag">보충</span>으로 표시했습니다. 데모 두 개는 영상의 설명을 직접 만져 보도록 이 노트에서 덧붙인 것이고 영상에는 없습니다.</p>
+
+<!-- 1 -->
+<h2 id="k1">1. 같은 분류기 하나, 이상하게 긴 라벨 <a class="ts" data-t="0">0:00</a></h2>
+<p>영상은 논문 설명보다 먼저 논문 부록의 예측 예시 그림을 보여 줍니다. 음식 사진을 101개 라벨 중 과카몰리로, 실내 사진을 397개 라벨 중 TV 스튜디오로, 위성 사진을 토지 이용 유형으로, 자동차 사진을 차종으로 분류한 결과들입니다. Kilcher가 짚는 것은 두 가지입니다.</p>
+<ul>
+  <li><strong>전부 같은 분류기다.</strong> 데이터셋마다 다른 모델이 아니고 파인튜닝도 하지 않았습니다. 이 데이터셋들로 학습한 적이 없는 제로샷 분류기 하나가 서로 다른 과제를 모두 처리합니다.</li>
+  <li><strong>라벨이 단어가 아니다.</strong> 분류기가 고른 라벨은 <code>guacamole</code>가 아니라 <code>a photo of guacamole, a type of food</code>이고, 위성 사진에서는 <code>a centered satellite photo of permanent crop land</code>입니다. 보통의 분류기에서는 볼 수 없는 긴 문장입니다.</li>
+</ul>
+<p>이 두 가지가 왜 그런지를 설명하는 것이 영상 전체의 줄거리입니다. Kilcher는 CLIP을 같은 날 공개된 DALL·E와 대비합니다. DALL·E는 텍스트에서 이미지를 <em>생성</em>하고, CLIP은 이미지와 텍스트를 <strong>생성하지 않는 방식으로 연결</strong>합니다. 논문의 서론과 관련 연구 절이 선행 연구의 공을 꼼꼼히 인정한다는 평도 덧붙입니다.</p>
+
+<!-- 2 -->
+<h2 id="k2">2. 이미지와 텍스트를 잇는 첫 번째 생각: 텍스트 예측 <a class="ts" data-t="280">4:40</a></h2>
+<p>출발점은 데이터입니다. 고양이 사진과 "my cute cat" 같은 글은 SNS, Pinterest, Flickr에 널려 있어서 <strong>라벨을 붙이지 않고도</strong> (이미지, 텍스트) 쌍을 긁어모을 수 있습니다. 반면 분류기를 학습하려면 ImageNet의 1,000개(또는 22,000개), MNIST의 10개처럼 미리 정한 클래스로 라벨이 붙은 예시가 필요합니다. 이미지를 옆에 달린 글과 연결하는 법을 배울 수 있다면 라벨 집합에 묶이지 않습니다.</p>
+<p>가장 먼저 떠오르는 방법은 <strong>이미지에서 텍스트를 예측</strong>하는 것입니다. Kilcher는 이 방법의 목적이 캡션 생성기가 아니라 <strong>좋은 표현</strong>이라는 점을 설명합니다. 이미지를 받아 "my cat"을 출력하는 신경망이라면, 중간 층 어딘가에 픽셀 값이 아닌 "고양이"라는 개념의 표현이 있어야 합니다. 그렇지 않으면 마지막에 cat이라는 단어를 낼 수 없습니다. 그 중간 표현을 꺼내 다른 과제에 쓰자는 것입니다.</p>
+<p>그런데 논문 그림 2에서 이 방식은 잘 되지 않습니다. Transformer 언어 모델로 캡션을 예측하는 쪽보다, 어떤 단어가 <em>들어 있는지만</em> 맞히는 bag-of-words 예측이 더 효율적이고(cat, my, cute를 순서 없이 맞히면 정답), 논문이 제안한 대조 방식은 그보다 훨씬 위에 있습니다. Kilcher의 표현으로는 앞의 두 곡선이 오르기는 해도 대조 방식의 선에 닿을지 의문입니다. 세 과제의 차이는 <a href="./#s3">본편 3절</a>의 예시 표를 보세요.</p>
+
+<!-- 3 -->
+<h2 id="k3">3. 점수만 매길 수 있으면 분류기가 된다 <a class="ts" data-t="540">9:00</a></h2>
+<p>영상에서 가장 공들인 부분입니다. Kilcher는 대조 학습을 설명하기 <strong>전에</strong>, 텍스트를 예측하는 모델로 제로샷 분류기를 만드는 법부터 설명합니다.</p>
+<p>이미지에서 텍스트를 예측하는 모델은 보통 텍스트를 생성할 뿐 아니라 <strong>주어진 텍스트의 가능도</strong>도 알려 줍니다. 그러면 생성을 시키는 대신 이렇게 물을 수 있습니다.</p>
+<div class="flow">
+  <span>이미지</span><em>+</em><span>"dog"는 얼마나 그럴듯한가?</span><em>→</em><span>점수</span>
+</div>
+<div class="flow" style="margin-top:-8px">
+  <span>이미지</span><em>+</em><span>"cat"은?</span><em>→</em><span>점수</span><em>·</em>
+  <span>이미지</span><em>+</em><span>"mouse"는?</span><em>→</em><span>점수</span>
+</div>
+<p>과제의 클래스마다 한 번씩 묻고 점수를 정규화하면 그것이 분류기입니다. ImageNet이라면 1,000개 클래스를 하나씩 넣어 묻습니다. 학습은 필요 없고, <strong>모델이 낼 수 있는 출력을 그 과제의 클래스로 제한</strong>하기만 하면 됩니다.</p>
+<div class="easy">
+  <span class="lbl">Kilcher의 비유</span>
+  <h3>Q-러닝에서 행동마다 값을 묻는 것과 비슷하다</h3>
+  <p>Q-러닝에서는 매 스텝 모델에게 "행동 1을 하면?" "행동 2를 하면?"을 물어 값이 가장 큰 행동을 고릅니다. 제로샷 분류도 후보 라벨마다 "이 문장이 이 이미지와 얼마나 맞는가"를 물어 가장 큰 것을 고릅니다. Kilcher도 "아주 조금" 비슷하다고 단서를 답니다.</p>
+</div>
+<p>여기서 1절의 긴 라벨이 설명됩니다. 모델은 단어 하나뿐 아니라 <strong>문장</strong>의 가능도도 매길 수 있으므로, "dog" 대신 "a photo of a dog"를 물을 수 있습니다. 그리고 같은 클래스라도 어떻게 묻느냐에 따라 분류기의 품질이 달라집니다. 이유는 학습 데이터에 있습니다. 인스타그램에 고양이 사진을 올리면서 글을 "cat" 한 단어만 쓰는 사람은 드물고, "here's a photo of my cat"이나 "#photo #cat"처럼 씁니다. 이미지가 사진이라는 것을 안다면 "a photo of a …"로 묻는 편이 학습 때 본 텍스트와 가까워 잡음이 적은 신호를 줍니다.</p>
+<p>그래서 1절의 분류기들은 데이터셋의 라벨에 <strong>사람이 그 데이터셋에 맞게 고친 프롬프트</strong>를 씌워 만든 것입니다. Kilcher는 "다시 프롬프트 엔지니어링으로 돌아왔다"고 말합니다. GPT-3에서 익숙해진 그 작업이 비전에도 들어온 것입니다.</p>
+<div class="key"><span class="lbl">설명 순서의 요점</span><p>제로샷 분류는 대조 학습에서 나오는 성질이 아니라, <strong>이미지와 텍스트 사이에 점수를 매길 수 있는 모든 모델</strong>이 갖는 성질이다. CLIP은 이 성질은 그대로 두고, 그런 모델을 얻는 학습 과제만 텍스트 예측에서 대조로 바꾼다.</p></div>
+
+<!-- 4 -->
+<h2 id="k4">4. 대조 목적 함수: 두 방향에서 본 분류 문제 <a class="ts" data-t="880">14:40</a></h2>
+<p>이제 과제를 바꿉니다. 미니배치의 이미지들을 이미지 인코더에 넣어 벡터 하나씩을 얻고, 텍스트들을 텍스트 인코더에 넣어 역시 벡터 하나씩을 얻습니다. 첫 번째 텍스트가 첫 번째 이미지의 짝, 두 번째가 두 번째의 짝이라는 것은 <strong>그렇게 긁어 왔기 때문에</strong> 압니다. 이제 이미지에서 텍스트를 예측하지 않고, 이 이미지 표현에 <strong>배치 안의 텍스트 중 어느 것이 가장 맞는지</strong>만 묻습니다.</p>
+<ul>
+  <li><strong>왜 "대조"인가</strong>: 짝이라고 아는 것(행렬의 대각선)과 짝이 아니라고 보는 것(나머지)을 대비시키기 때문입니다.</li>
+  <li><strong>"짝이 아니다"는 가정이다</strong>: Kilcher가 짚는 대목입니다. 다른 설명 문구가 이 이미지에도 맞을지는 사실 알 수 없습니다. 다만 미니배치를 무작위로 뽑으므로, 무작위로 뽑힌 글이 인터넷에서 그 이미지와 함께 있던 글만큼 잘 맞지는 않을 것이라고 안전하게 가정할 수 있습니다.</li>
+  <li><strong>두 방향</strong>: 이미지 하나마다 "맞는 텍스트는 하나"인 분류 문제가 생기고, 텍스트 하나마다 "맞는 이미지는 하나"인 분류 문제가 생깁니다. 내적을 로짓으로 보고 한 방향으로 소프트맥스, 다른 방향으로 소프트맥스를 취합니다. 같은 분류 문제를 두 각도에서 본 대칭 손실입니다.</li>
+  <li><strong>큰 배치에 의존한다</strong>: 이상적으로는 이 이미지가 짝 텍스트와 가깝고 <em>데이터셋의 다른 모든 것</em>과 멀어야 합니다. 실제로는 그 근사로 <em>미니배치 안의 다른 것</em>과 멀어지게 합니다. 배치가 데이터셋 전체에 가까워질수록 표현이 세밀해집니다.</li>
+</ul>
+<p>추론은 3절과 같습니다. 이미지를 이미지 인코더에 넣고, 과제의 라벨들을 사람이 만든 프롬프트에 끼워 텍스트 인코더에 넣은 뒤, 내적이 가장 큰 라벨을 고릅니다. 대칭이므로 반대 방향도 됩니다. 텍스트 하나에 이미지 여러 장을 주면 <strong>텍스트 분류기</strong>(이미지 검색)가 됩니다. Kilcher는 공개 직후부터 사람들이 CLIP으로 StyleGAN을 이끌어 설명문에 맞는 그림을 만들고 있다고 소개합니다.</p>
+<p class="note"><span class="tag">보충</span> 영상은 손실을 내적과 소프트맥스로만 설명하고 온도 파라미터는 다루지 않습니다. 임베딩을 L2 정규화하면 내적이 −1과 1 사이에 갇혀서, 온도 스케일 없이는 큰 배치에서 손실이 거의 내려가지 않습니다. <a href="./#s4">본편 데모 1</a>에서 직접 확인할 수 있습니다.</p>
+
+<!-- 5 -->
+<h2 id="k5">5. 왜 분류 사전학습보다 좋은 표현인가 <a class="ts" data-t="1240">20:40</a></h2>
+<p>논문에 명시된 문장은 아니고 Kilcher가 덧붙인 직관입니다. 이미지 분류로 사전학습한 모델은 <strong>모든 개를 한 덩어리로 뭉칩니다.</strong> "개" 클래스 안에서 개들을 서로 구별할 이유가 없기 때문입니다. 당면한 분류 문제와 상관없는 정보도 모두 버립니다.</p>
+<p>대조 학습 모델은 다릅니다. 논문 그림 1의 캡션 "Pepper the aussie pup"을 예로 들면, 모델이 약할 때는 pup에만 반응해 "개 분류기"와 다를 바 없습니다. 모델이 좋아지면 aussie를 반영해 다른 품종과 구별하고, pup이 어린 개라는 것을 알게 되고, 결국 이름까지 배울 수 있습니다. <strong>모델이 강해질수록 텍스트에서 더 많은 뉘앙스를 가져갑니다.</strong> 클래스 라벨에는 그런 여지가 없습니다.</p>
+
+<div class="demo">
+  <h4>데모 A · 모델이 강해질수록 캡션에서 더 많이 가져간다</h4>
+  <p class="cap">영상의 설명을 그림으로 옮긴 것입니다(실제 모델을 돌리는 것이 아닙니다). 슬라이더를 올리면 모델이 구별에 쓰는 단어가 늘고, 그만큼 같은 배치 안에서 헷갈리던 가짜 짝이 줄어듭니다.</p>
+  <div class="ctrls"><div class="ctrl"><label>모델의 능력 <b id="aLvV"></b></label><input type="range" id="aLv" min="0" max="3" value="0"></div></div>
+  <div class="row"><span class="lab">이 이미지의 캡션</span><span class="chips" id="aCap" style="margin:0"></span></div>
+  <div id="aList" style="margin-top:10px"></div>
+  <p class="info" id="aInfo"></p>
+</div>
+<p>맨 왼쪽(분류 사전학습)에서는 "개"라는 것만 남으므로 개가 나오는 캡션 네 개가 모두 같은 것으로 보입니다. 오른쪽으로 갈수록 헷갈리는 후보가 하나씩 떨어져 나갑니다. 4절의 "배치가 커야 한다"와 이어지는 이야기입니다. 배치에 다른 개 사진이 한 장도 없다면 pup만 알아도 손실이 0이 되어, 그 이상을 배울 압력이 없습니다.</p>
+
+<!-- 6 -->
+<h2 id="k6">6. 인코더와 프롬프트 앙상블 <a class="ts" data-t="1345">22:25</a></h2>
+<ul>
+  <li><strong>텍스트 인코더</strong>는 Transformer이고 특별히 크지 않습니다. 문장 끝 토큰(EOS) 위치의 표현을 문장 전체의 벡터로 씁니다.</li>
+  <li><strong>이미지 인코더</strong>는 ResNet 변형 여러 개와 Vision Transformer 변형 여러 개를 시험했습니다. 논문 그래프에 CLIP이 여러 점으로 찍혀 있는 이유입니다.</li>
+  <li><strong>프롬프트</strong>는 더 잘 만들면 성능이 오르고, 여러 프롬프트를 앙상블하면 더 오릅니다. 논문 그림 4에서 대응하는 점들은 같은 모델(같은 계산량)인데 위로 올라가 있습니다. 같은 성능을 기준으로 보면 계산을 아낀 셈입니다. Kilcher는 프롬프트 엔지니어링이 앞으로 훨씬 중요해질 것이라고 내다봅니다.</li>
+</ul>
+<p class="note"><span class="tag">보충</span> 영상에서 Kilcher는 "모델 크기와 함께 데이터 양도 키운 것 같다"고 추측하듯 말하는데, 논문에서 데이터는 모든 모델이 같은 4억 쌍·32 에폭이고 달라지는 것은 모델 크기(와 그에 따른 계산량)입니다.</p>
+
+<!-- 7 -->
+<h2 id="k7">7. 제로샷 CLIP vs ResNet-50 선형 프로브 <a class="ts" data-t="1500">25:00</a></h2>
+<p>논문 그림 5를 읽기 전에 Kilcher는 비교 대상인 <strong>선형 프로브</strong>가 무엇인지 설명합니다.</p>
+<ol>
+  <li>ResNet-50을 ImageNet 1,000개 클래스 분류로 학습합니다.</li>
+  <li>마지막 분류층을 떼어 내고, 그 앞까지를 "ImageNet을 풀 수 있으니 표현력이 괜찮을" 특징 추출기로 봅니다.</li>
+  <li>특징 추출기는 <strong>고정</strong>하고, 그 위에 새 과제용 선형 분류기 하나만 학습합니다.</li>
+</ol>
+<p>네트워크 전체를 새 과제로 다시 학습하는 파인튜닝과 다릅니다. 논문이 대부분의 실험을 선형 프로브로 한 이유는 그쪽이 <strong>바탕 표현 자체의 품질</strong>을 더 잘 보여 주기 때문입니다. Kilcher는 ResNet-50이 최고 성능과는 거리가 있는 기준선이라는 점도 분명히 합니다.</p>
+<p>그림 5에서 Kilcher가 읽어 내는 것들입니다.</p>
+<ul>
+  <li><strong>많은 데이터셋에서 제로샷이 이긴다.</strong> 한쪽은 해당 데이터셋 전체로 학습했고 다른 쪽은 그 데이터셋으로 아무 학습도 하지 않았습니다. 사전학습이 거대하긴 하지만, GPT-3처럼 한 번 크게 학습해 두고 여러 일에 쓰는 구조입니다.</li>
+  <li><strong>ImageNet에서도 이긴다.</strong> ResNet-50의 표현은 ImageNet으로 만든 것이라 그 위의 선형 분류기는 원래 성능을 되찾을 뿐인데, 제로샷 CLIP이 그것을 넘습니다. Kilcher가 "crazy"라고 하는 지점입니다.</li>
+  <li><strong>STL10에서는 최고 기록.</strong> 클래스당 학습 예시가 아주 적어 지도 학습이 어렵고 ImageNet과도 그리 비슷하지 않아 전이 학습도 쉽지 않은 데이터셋입니다. 여기서 Kilcher는 CLIP이 잘 맞는 영역을 정리합니다. <strong>인터넷에 흔한 자연 이미지이면서, ImageNet과는 다르고, 라벨이 붙은 예시가 거의 없는 과제</strong>입니다.</li>
+  <li><strong>전문 영역에서는 진다.</strong> 종양 분류나 위성 사진은 인터넷에서 설명 글과 함께 돌아다니는 종류의 이미지가 아닙니다. 딥러닝에서 가장 쉬운 과제에 속하는 MNIST에서도 크게 뒤집니다.</li>
+</ul>
+<p>Kilcher가 재미있어하는 대목이 하나 있습니다. 논문의 지적대로 대부분의 분류 데이터셋은 <strong>클래스 이름을 부차적으로 취급</strong>합니다. 이미지에는 숫자 ID만 달려 있고 ID를 영어 이름으로 바꾸는 파일이 따로 있으며, Flowers102와 독일 교통 표지판(GTSRB)은 공개 버전에 그 대응표조차 없습니다. 제로샷은 라벨이 언어여야 하므로 저자들이 클래스를 보고 직접 이름을 붙여야 했습니다. 논문 각주에는 Alec이 이 프로젝트를 하면서 꽃 종과 독일 교통 표지판에 대해 예상보다 훨씬 많이 배웠다고 적혀 있습니다.</p>
+<p class="note"><span class="tag">보충</span> 영상 시점에는 작은 모델(ViT-B/32)의 가중치만 공개되어 있었습니다. 이후 OpenAI는 논문의 나머지 모델들도 공개했습니다.</p>
+
+<!-- 8 -->
+<h2 id="k8">8. 제로샷 vs few-shot: 곡선이 먼저 내려가는 이유 <a class="ts" data-t="1910">31:50</a></h2>
+<p>앞 절의 선형 프로브는 데이터셋 전체로 학습했습니다. 그림 6은 클래스당 예시가 몇 장뿐인 상황을 흉내 냅니다. 사전학습의 가치가 가장 잘 드러나는 조건입니다. 결과는 두 가지입니다.</p>
+<ul>
+  <li>제로샷 CLIP은 공개 모델 중 가장 좋은 축에 드는 BiT-M에 클래스당 16장으로 선형 프로브를 올린 것과 비슷합니다. 16장씩 학습해도 <strong>아무 학습도 하지 않은</strong> CLIP 제로샷 수준이라는 뜻입니다.</li>
+  <li>CLIP 자체에 선형 프로브를 올리면 다른 모델들을 크게 앞섭니다.</li>
+</ul>
+<p>그런데 CLIP의 few-shot 곡선은 이상하게 생겼습니다. 클래스당 1~2장에서는 제로샷보다 <strong>오히려 낮고</strong>, 4장쯤에서야 제로샷을 따라잡습니다. 예시를 줬는데 왜 나빠질까요? Kilcher의 설명은 이렇습니다.</p>
+<div class="key"><span class="lbl">두 분류기는 서로 다른 물건이다</span><p>제로샷 분류기의 "마지막 층"은 텍스트 인코더가 만든 것이고, 사전학습으로 <strong>이미 학습되어 있다.</strong> 선형 프로브는 그 부분을 통째로 버리고 새 마지막 층을 <strong>무작위 초기화</strong>에서 다시 학습한다. 클래스당 한 장으로는 부족해서 특징의 우연한 상관관계를 집어 들고, 그래서 처음에는 더 나쁘다.</p></div>
+
+<div class="demo">
+  <h4>데모 B · few-shot 선형 프로브는 몇 장부터 제로샷을 넘는가</h4>
+  <p class="cap">단순 모형입니다. 클래스 20개, 32차원. 이미지 특징은 클래스의 참 방향에 잡음이 더해진 것이고, 제로샷 분류기는 참 방향에서 조금 어긋난 벡터(텍스트로 만든 가중치)입니다. few-shot 분류기는 텍스트를 쓰지 않고 클래스당 예시 k장의 평균만으로 만듭니다.</p>
+  <div class="ctrls">
+    <div class="ctrl"><label>텍스트로 만든 분류기의 어긋남 <b id="bTV"></b></label><input type="range" id="bT" min="0" max="20" value="8"></div>
+    <div class="ctrl"><label>이미지 한 장의 잡음 <b id="bIV"></b></label><input type="range" id="bI" min="5" max="25" value="15"></div>
+  </div>
+  <canvas id="cvB" height="250"></canvas>
+  <div class="legend"><span><i style="background:var(--s2)"></i>제로샷 (예시 0장)</span><span><i style="background:var(--s1)"></i>few-shot (클래스당 k장)</span></div>
+  <div class="readout">
+    <div>제로샷<b id="bZ"></b></div>
+    <div>1-shot<b id="b1"></b></div>
+    <div>16-shot<b id="b16"></b></div>
+    <div>제로샷을 넘는 지점<b id="bX"></b></div>
+  </div>
+</div>
+<p>예시 한 장으로 만든 분류기는 그 한 장의 잡음을 그대로 안고 있어서, 조금 어긋났더라도 개념을 직접 가리키는 텍스트 분류기보다 못합니다. 예시가 늘면 잡음이 평균되어 사라지고 어느 지점에서 넘어섭니다. "어긋남"을 0으로 내리면 넘는 지점이 한없이 뒤로 밀리고, 크게 올리면 한두 장으로도 넘습니다. 논문에서 이 지점이 데이터셋마다 크게 달랐던 것(클래스당 1장 미만부터 184장까지, 중앙값은 <a href="./#s9">본편 9절</a>)도 같은 이야기입니다. 텍스트로 잘 지정되는 개념일수록 제로샷이 오래 버팁니다.</p>
+<p>Kilcher는 이 절을 이렇게 요약합니다. 제로샷과 선형 프로브의 우열은 데이터셋마다 매우 다르고, 자연 이미지에서 멀어질수록 제로샷이 약합니다. 결국 이 논문은 <strong>인터넷에 어떤 종류의 이미지가 올라와 있는가에 대한 연구</strong>이기도 합니다.</p>
+
+<!-- 9 -->
+<h2 id="k9">9. 스케일링과 과제별 비교 <a class="ts" data-t="2135">35:35</a></h2>
+<p>데이터와 계산을 늘리면 같은 종류의 모델에서도 오차가 내려간다는 머신러닝의 경향이 여기서도 성립합니다. ResNet 백본을 키울수록 제로샷 성능이 모델 계산량의 함수로 매끄럽게 오릅니다(그림 9). 다만 Kilcher는 논문의 단서를 함께 전합니다. 매끄러운 것은 <strong>평균</strong> 곡선이고, 개별 과제의 성능은 들쭉날쭉합니다. 데이터셋을 어떻게 골랐는지, 프롬프트를 어떻게 만들었는지 때문일 수 있고 아직 모르는 것이 많습니다.</p>
+<p>선형 프로브 비교(그림 10)에서 CLIP은 당시 최고 수준의 비전 모델들을 앞섭니다. 기존 연구에서 쓰던 12개 데이터셋은 ImageNet과 비슷한 편이고, 27개로 넓히면 격차가 더 벌어집니다. Kilcher는 데이터셋을 더 넣는 것 자체가 <strong>선택 편향</strong>일 수 있다는 점을 짚으면서도, 평범한 사용자가 자기 분류기를 쉽게 만들 수 있는 쪽으로 한 걸음 나아간 것이라고 평가합니다.</p>
+
+<!-- 10 -->
+<h2 id="k10">10. 분포 이동: 바나나는 노랗다 <a class="ts" data-t="2260">37:40</a></h2>
+<p>ImageNet으로 학습한 모델은 ImageNet에서 조금만 벗어나도 성능이 크게 떨어집니다. ImageNetV2는 원래 테스트 세트와 최대한 같은 절차로 새로 모은 테스트 세트일 뿐인데 모든 분류기의 성능이 내려갔습니다. 스케치로 그린 것, 물체를 고약한 위치에 놓은 것으로 가면 더 떨어집니다. 사람은 여전히 알아보는 이미지들이고 클래스도 ImageNet과 같습니다.</p>
+<p>논문 그림 13은 ImageNet 정확도가 같은 두 모델을 비교합니다. Kilcher는 먼저 제로샷 분류기가 ImageNet으로 완전히 학습한 모델과 같은 정확도를 낸다는 것 자체가 큰 성취라고 강조한 뒤, 데이터셋이 어려워질수록 한쪽은 계속 내려가고 CLIP은 유지하거나 오히려 오르는 것을 보여 줍니다. 그의 설명은 바나나 예시입니다.</p>
+<div class="tw"><table>
+<tr><th></th><th>ImageNet으로 학습한 분류기</th><th>CLIP</th></tr>
+<tr><td>학습 중 해야 하는 일</td><td>이 데이터셋의 이 클래스들을 서로 구별하는 것이 전부</td><td>이미지를 옆의 글과 연결하는 것</td></tr>
+<tr><td>바나나에 대해 배우는 것</td><td>다른 999개 클래스와 구별되는 특징이면 충분. "바나나는 노랗다"</td><td>둘 다 banana로 설명되지만, 한 장에는 레몬도 있고 과일 더미이며 잡지 화보 같고, 다른 한 장은 바나나 더미에 떨어뜨린 액션캠 영상 같다는 것까지 표현해야 글과 맞출 수 있다</td></tr>
+<tr><td>스케치를 보면</td><td>본 적이 없다. 노랗지 않은 바나나는 바나나가 아니다</td><td>표현이 여러 특징에 걸쳐 있어 더 쉽게 옮겨 간다</td></tr>
+</table></div>
+<p>그림 13의 산점도에서 이상적으로 강건한 모델은 분포 이동 데이터셋에서도 ImageNet과 같은 정확도를 내는 대각선 위에 있습니다. 기존의 ImageNet 학습 모델들은 각종 강건성 기법을 쓴 것까지 포함해 한 줄의 추세선에서 거의 벗어나지 못하는데, ImageNet으로 학습한 적도 없는 제로샷 분류기가 그 선을 크게 벗어납니다. Kilcher는 <strong>ImageNet으로 학습하지 않았다는 사실 자체가 도움이 되는 요인</strong>일 수 있다고 봅니다.</p>
+<p>CLIP 위에 ImageNet으로 선형 프로브(로지스틱 회귀)를 올리면 ImageNet 정확도는 크게 오르고 다른 데이터셋의 성능은 조금만 내려갑니다. Kilcher는 이것을 표현 자체가 안정적이라는 증거로 읽습니다. 순수한 분류로 선형 분류기를 학습해도 다른 과제의 성능이 대체로 유지된다는 것입니다.</p>
+<p class="note"><span class="tag">보충</span> 같은 실험을 논문은 조금 다른 쪽에서 강조합니다. ImageNet 정확도가 9.2%p나 올랐는데도 분포 이동 평균 정확도는 따라 오르지 않고 약간 내려갔다는 점, 즉 ImageNet에 맞추면서 얻은 이득이 ImageNet 밖으로는 옮겨 가지 않는다는 점입니다(<a href="./#s10">본편 10절</a>). 두 읽기는 같은 그래프의 양면입니다.</p>
+
+<!-- 11 -->
+<h2 id="k11">11. 사회적 영향 절과 Kilcher의 총평 <a class="ts" data-t="2660">44:20</a></h2>
+<p>영상 후반은 빠르게 넘어갑니다. 사람과의 비교에서는 CLIP이 어려워하는 샘플을 사람도 어려워한다는 것, 학습 데이터 4억 쌍과 평가 데이터셋의 중복을 검사했지만 중복이 있어도 대체로 문제가 되지 않았다는 것을 언급합니다.</p>
+<p>서너 쪽 분량의 사회적 영향 절에 대해 Kilcher는 약간 비꼬는 투입니다. "이런 모델에는 문제가 있다, 우리는 다른 모델보다 낫지만 아직 충분하지 않다, 더 연구가 필요하다"는 식으로 읽힌다는 것입니다. 그래도 흥미로운 결과로 FairFace 실험을 소개합니다. 라벨이 고정되어 있지 않고 무엇이든 줄 수 있으므로, 얼굴 이미지의 후보 라벨에 사람이 아닌 범주와 범죄 관련 범주를 섞어 넣고 모델이 어떻게 잘못 행동하는지 봅니다. 오분류는 어린 연령대에 몰려 있었는데, 후보에 <strong>child 범주 하나를 추가하자</strong> 그 오분류가 크게 줄었습니다. 모델에게 "아이"라고 답할 선택지가 생겼기 때문입니다.</p>
+<p>Kilcher가 이 절에서 가져가는 결론은 <strong>프롬프트(후보 라벨)를 어떻게 설계하느냐가 결과를 크게 좌우한다</strong>는 것입니다. 이미 알던 사실이지만 민감한 응용에서는 특히 결정적입니다.</p>
+<h3>총평 <a class="ts" data-t="2820">47:00</a></h3>
+<ul>
+  <li>평범한 사람이 자기 분류기를 만들기 쉬워지는 방향의 한 걸음입니다. <strong>자연 이미지이기만 하면</strong> 꽤 좁은 과제에도 잘 통할 것입니다.</li>
+  <li>모델을 다루는 방식에 자유가 생겼습니다.</li>
+  <li>기대되는 것은 다른 모델과의 연결입니다. DALL·E와는 이미 연결되어 있고, StyleGAN과 연결하는 사람들이 있으며, GPT-3 같은 모델과도 연결될 것이라고 예상합니다.</li>
+</ul>
+<p class="note"><span class="tag">보충</span> 이 예상은 대부분 실현되었습니다. CLIP의 임베딩과 인코더는 DALL·E 2, Stable Diffusion, LLaVA 계열 시각-언어 모델의 부품이 되었습니다. <a href="./#s12">본편 12절</a>에 정리했습니다.</p>
+
+<!-- 12 -->
+<h2 id="k12">12. 확인 퀴즈</h2>
+<div id="quiz"></div>
+<p class="quiz-score" id="quizScore"></p>
+
+<footer>
+<p><strong>출처</strong></p>
+<ul class="refs">
+<li>Yannic Kilcher (2021. 1. 12), <em>OpenAI CLIP: Connecting Text and Images (Paper Explained)</em> — <a href="https://www.youtube.com/watch?v=T9XSU0pKX2E" target="_blank" rel="noopener">YouTube</a> (48분)</li>
+<li>Radford et al. (2021), <em>Learning Transferable Visual Models From Natural Language Supervision</em>, ICML 2021 — <a href="https://arxiv.org/abs/2103.00020" target="_blank" rel="noopener">arXiv:2103.00020</a></li>
+</ul>
+<p style="margin-top:18px"><a href="./">← How CLIP Works 본편</a> · <a href="https://github.com/dev-jonghoonpark/how-ai-works">how-ai-works</a> 시리즈</p>
+</footer>
+</div>
+<script>
+var $=function(s){return document.querySelector(s);};
+var cssCache={};
+function css(v){return v in cssCache?cssCache[v]:(cssCache[v]=getComputedStyle(document.documentElement).getPropertyValue(v).trim());}
+function setup(cv){
+  if(!cv.dataset.h)cv.dataset.h=cv.getAttribute('height');
+  var dpr=Math.min(2,window.devicePixelRatio||1), w=cv.clientWidth, h=+cv.dataset.h;
+  var bw=Math.round(w*dpr), bh=Math.round(h*dpr);
+  if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;cv.style.height=h+'px';}
+  var c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
+  c.clearRect(0,0,w,h);
+  return {c:c,w:w,h:h};
+}
+function fmt(x,d){var s=(+x).toFixed(d==null?2:d);return (+s===0?s.replace('-',''):s).replace('-','−');}
+function font(c,sz,w){c.font=(w||'')+' '+sz+'px system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif';}
+function pct(x){return fmt(x*100,1)+'%';}
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){var u=1-r(),v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+/* 타임스탬프 링크 */
+var VID='https://www.youtube.com/watch?v=T9XSU0pKX2E';
+document.querySelectorAll('a.ts').forEach(function(a){a.href=VID+'&t='+a.dataset.t+'s';a.target='_blank';a.rel='noopener';a.title='영상의 이 지점 열기';a.textContent='▶ '+a.textContent;});
+
+/* ══════ 데모 A ══════ */
+var A_LV=['분류 사전학습 ("개" 클래스)','대조 · 약한 모델','대조 · 중간 모델','대조 · 강한 모델'];
+var A_WORDS=[['Pepper',3],['the',9],['aussie',2],['pup',1]];
+/* need: 이 후보를 정답과 구별하는 데 필요한 능력 단계 */
+var A_CAND=[
+ {t:'Pepper the aussie pup',need:0,ok:true,why:''},
+ {t:'Max the aussie pup',need:3,why:'이름(Pepper)을 알아야 구별'},
+ {t:'a husky pup in the snow',need:2,why:'품종(aussie)을 알아야 구별'},
+ {t:'an old dog sleeping',need:1,why:'pup(어린 개)을 알아야 구별'},
+ {t:'a plane on the runway',need:0,why:'개가 아니므로 처음부터 구별'},
+ {t:'a bowl of ramen',need:0,why:'개가 아니므로 처음부터 구별'}];
+function aDraw(){var lv=+$('#aLv').value;$('#aLvV').textContent=A_LV[lv];
+  $('#aCap').innerHTML=A_WORDS.map(function(w){return '<span class="chip'+(w[1]<=lv?' tok':'')+'">'+w[0]+'</span>';}).join('');
+  var conf=0,h='';A_CAND.forEach(function(q){var same=!q.ok&&q.need>lv;if(same)conf++;
+    h+='<div class="arow"><span class="chip '+(q.ok?'ok':same?'bad':'')+'">'+q.t+'</span><span class="mini" style="margin:0">'+(q.ok?'정답 (진짜 짝)':same?'정답과 구별하지 못함 — '+q.why:'구별됨'+(q.need?' — '+q.why.replace('알아야 구별','반영'):''))+'</span></div>';});
+  $('#aList').innerHTML=h;
+  $('#aInfo').innerHTML=lv===0?'<b>개는 전부 한 덩어리.</b> 클래스 라벨이 "개"뿐이면 개들을 서로 구별할 이유가 없습니다. 헷갈리는 후보 '+conf+'개.'
+    :lv===1?'<b>pup에 반응.</b> 사실상 "어린 개 분류기"입니다. 헷갈리는 후보 '+conf+'개.'
+    :lv===2?'<b>aussie까지 반영.</b> 다른 품종과 구별합니다. 헷갈리는 후보 '+conf+'개.'
+    :'<b>이름까지.</b> 캡션의 모든 단어가 구별에 쓰입니다. 헷갈리는 후보 0개.';}
+$('#aLv').addEventListener('input',aDraw);
+
+/* ══════ 데모 B ══════ */
+var BK=[1,2,4,8,16,32,64],bRes=null;
+function dot(a,b){var s=0;for(var i=0;i<a.length;i++)s+=a[i]*b[i];return s;}
+function bSim(){var st=+$('#bT').value/10,si=+$('#bI').value/10,K=20,d=32,r=mulberry(77),k,i,j,q;
+  $('#bTV').textContent=fmt(st,1);$('#bIV').textContent=fmt(si,1);
+  function vec(sc){var v=new Float32Array(d),n=0;for(var a=0;a<d;a++){v[a]=gauss(r);n+=v[a]*v[a];}n=sc/Math.sqrt(n);for(a=0;a<d;a++)v[a]*=n;return v;}
+  function add(a,b){var o=new Float32Array(d);for(var x=0;x<d;x++)o[x]=a[x]+b[x];return o;}
+  function norm(a){var n=Math.sqrt(dot(a,a))||1,o=new Float32Array(d);for(var x=0;x<d;x++)o[x]=a[x]/n;return o;}
+  var C=[];for(k=0;k<K;k++)C.push(vec(1));
+  var test=[];for(i=0;i<400;i++)test.push([i%K,add(C[i%K],vec(si))]);
+  function acc(W){var ok=0;test.forEach(function(t){var b=-1,bv=-1e9;for(var c=0;c<K;c++){var v=dot(t[1],W[c]);if(v>bv){bv=v;b=c;}}if(b===t[0])ok++;});return ok/test.length;}
+  var REP=12,z=0,fs=BK.map(function(){return 0;});
+  for(var rep=0;rep<REP;rep++){
+    z+=acc(C.map(function(c){return norm(add(c,vec(st)));}));
+    var sum=C.map(function(){return new Float32Array(d);}),bi=0;
+    for(j=1;j<=64;j++){for(k=0;k<K;k++){var x=add(C[k],vec(si));for(q=0;q<d;q++)sum[k][q]+=x[q];}
+      if(j===BK[bi]){fs[bi]+=acc(sum.map(norm));bi++;}}}
+  bRes={z:z/REP,fs:fs.map(function(v){return v/REP;})};
+  $('#bZ').textContent=pct(bRes.z);$('#b1').textContent=pct(bRes.fs[0]);$('#b16').textContent=pct(bRes.fs[4]);
+  var xi=-1;for(i=0;i<BK.length;i++)if(bRes.fs[i]>=bRes.z){xi=i;break;}
+  $('#bX').textContent=xi<0?'64장으로도 못 넘음':xi===0?'1장부터':BK[xi-1]+'~'+BK[xi]+'장 사이';
+  bDraw();}
+function bDraw(){if(!bRes)return;var g=setup($('#cvB')),c=g.c,L=42,R=g.w-16,T=18,B=g.h-36;
+  function X(k){return L+(R-L)*Math.log(k)/Math.log(64);} function Y(a){return B-(B-T)*a;}
+  font(c,10.5,'500');c.textBaseline='middle';
+  [0,0.25,0.5,0.75,1].forEach(function(a){c.strokeStyle=css('--grid');c.beginPath();c.moveTo(L,Y(a)+.5);c.lineTo(R,Y(a)+.5);c.stroke();c.fillStyle=css('--muted');c.textAlign='right';c.fillText(Math.round(a*100)+'%',L-6,Y(a));});
+  c.textAlign='center';BK.forEach(function(k){c.fillStyle=css('--muted');c.fillText(k,X(k),B+12);});
+  c.fillText('클래스당 라벨 예시 수 k (로그)',(L+R)/2,B+27);
+  c.strokeStyle=css('--s2');c.lineWidth=2;c.setLineDash([6,4]);c.beginPath();c.moveTo(L,Y(bRes.z));c.lineTo(R,Y(bRes.z));c.stroke();c.setLineDash([]);
+  c.strokeStyle=css('--s1');c.beginPath();BK.forEach(function(k,i){if(i)c.lineTo(X(k),Y(bRes.fs[i]));else c.moveTo(X(k),Y(bRes.fs[i]));});c.stroke();c.lineWidth=1;
+  BK.forEach(function(k,i){c.fillStyle=css('--s1');c.beginPath();c.arc(X(k),Y(bRes.fs[i]),4,0,7);c.fill();});}
+['#bT','#bI'].forEach(function(q){$(q).addEventListener('input',bSim);});
+
+/* ══════ 퀴즈 ══════ */
+var QZ=[
+ {q:'Kilcher가 대조 학습보다 먼저 설명한 "제로샷 분류기 만드는 법"의 핵심은?',o:['마지막 층만 새 데이터로 다시 학습한다','이미지–텍스트에 점수를 매길 수 있는 모델에 후보 라벨을 하나씩 물어 가장 높은 것을 고른다','클래스마다 예시 이미지를 한 장씩 보여 준다','캡션을 생성한 뒤 문자열을 비교한다'],a:1,e:'모델의 출력을 그 과제의 클래스로 제한하기만 하면 됩니다. 학습은 필요 없습니다. 이 성질은 대조 학습에만 있는 것이 아닙니다.'},
+ {q:'"cat" 대신 "a photo of a cat"으로 묻는 편이 나은 이유로 영상이 든 것은?',o:['문장이 길수록 Transformer가 정확해서','인터넷에서 사진에 "cat" 한 단어만 달아 올리는 경우는 드물어, 문장 쪽이 학습 때 본 텍스트와 가깝기 때문','토큰 수가 맞아야 해서','ImageNet 라벨이 원래 문장이라서'],a:1,e:'모델은 인터넷에서 긁은 텍스트로 학습했습니다. 학습 분포와 가까운 형태로 물어야 잡음이 적은 신호가 나옵니다.'},
+ {q:'분류 사전학습이 "모든 개를 한 덩어리로 뭉친다"는 말의 뜻은?',o:['개 이미지를 학습에서 제외한다는 뜻','같은 클래스 안의 차이를 구별할 이유가 없어 그 정보를 표현에서 버린다는 뜻','개 클래스의 정확도가 낮다는 뜻','배치에 개가 한 장만 들어간다는 뜻'],a:1,e:'대조 학습 모델은 강해질수록 캡션의 pup, aussie, 이름까지 구별에 씁니다. 클래스 라벨에는 그런 여지가 없습니다.'},
+ {q:'CLIP의 few-shot 선형 프로브가 1~2장에서 제로샷보다 낮은 이유는?',o:['예시 이미지가 손상되어서','선형 프로브는 텍스트 인코더가 만든 (이미 학습된) 분류기를 버리고 무작위 초기화된 새 층을 몇 장만으로 학습하기 때문','배치 크기가 작아서','온도가 고정되어서'],a:1,e:'제로샷 분류기와 선형 프로브는 서로 다른 분류기입니다. 한두 장으로는 우연한 상관관계를 집어 들기 쉽고, 4장쯤에서 회복합니다.'},
+ {q:'ImageNet 분류기가 스케치 데이터에서 무너지는 것을 Kilcher는 어떻게 설명하는가?',o:['스케치는 해상도가 낮아서','그 데이터셋의 클래스들을 서로 구별하는 데 필요한 특징만 배우고 나머지는 잊기 때문 ("바나나는 노랗다")','스케치 클래스가 ImageNet에 없어서','배치 정규화 통계가 달라서'],a:1,e:'CLIP은 이미지를 글과 맞춰야 하므로 더 여러 특징을 표현에 담아야 하고, 그래서 다른 분포로 더 잘 옮겨 갑니다.'},
+ {q:'FairFace 실험에서 child 범주를 추가하자 어린 연령대의 오분류가 줄었다. 영상이 여기서 끌어낸 교훈은?',o:['모델을 다시 학습해야 한다','후보 라벨(프롬프트)을 어떻게 설계하느냐가 결과를 크게 좌우한다','얼굴 데이터는 쓰면 안 된다','연령 분류는 불가능하다'],a:1,e:'라벨이 고정되어 있지 않다는 장점이 그대로 책임이 됩니다. 민감한 응용일수록 라벨 설계가 결정적입니다.'}
+];
+(function(){var box=$('#quiz'),score=0,done=0;
+  QZ.forEach(function(it,i){var d=document.createElement('div');d.className='q';
+    d.innerHTML='<h4>Q'+(i+1)+'. '+it.q+'</h4>'+it.o.map(function(o,j){return '<label class="opt"><input type="radio" name="q'+i+'" value="'+j+'"><span>'+o+'</span></label>';}).join('')+'<div class="expl"></div>';
+    box.appendChild(d);
+    d.querySelectorAll('input').forEach(function(inp){inp.addEventListener('change',function(){
+      if(d.dataset.done)return;d.dataset.done=1;done++;
+      var j=+inp.value,ok=j===it.a;if(ok)score++;
+      d.querySelectorAll('.opt').forEach(function(l,x){if(x===it.a)l.classList.add('correct');else if(x===j)l.classList.add('wrong');});
+      var ex=d.querySelector('.expl');ex.textContent=(ok?'정답! ':'오답. ')+it.e;ex.classList.add('show');if(!ok)ex.classList.add('bad');
+      $('#quizScore').textContent=done+'문제 중 '+score+'개 정답'+(done===QZ.length?' — 끝!':'');
+    });});
+  });
+})();
+
+/* ══════ 테마·초기화 ══════ */
+var tbtn=$('#themeBtn');
+if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');
+function syncBtn(){tbtn.textContent=document.documentElement.getAttribute('data-theme')==='dark'?'◑ 라이트':'◐ 다크';}
+tbtn.addEventListener('click',function(){var d=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',d?'light':'dark');cssCache={};syncBtn();bDraw();});
+syncBtn();cssCache={};aDraw();bSim();
+var rz,lastW=document.documentElement.clientWidth;
+window.addEventListener('resize',function(){clearTimeout(rz);rz=setTimeout(function(){
+  var w=document.documentElement.clientWidth;if(w===lastW)return;lastW=w;bDraw();},120);});
+</script>
+</body>
+</html>

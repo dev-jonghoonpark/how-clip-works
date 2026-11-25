@@ -19,6 +19,10 @@
 11. **한계와 사회적 영향** · MNIST 88%, 세기·세밀한 분류, 405년, FairFace 실험
 12. **그 뒤** · DALL·E 2, Stable Diffusion, LLaVA, ALIGN, SigLIP, 정리와 퀴즈 8문항
 
+## 영상 노트
+
+- **[Yannic Kilcher의 CLIP 해설 따라가기](https://dev-jonghoonpark.github.io/how-clip-works/kilcher.html)** — 「[OpenAI CLIP: Connecting Text and Images (Paper Explained)](https://www.youtube.com/watch?v=T9XSU0pKX2E)」(48분)을 영상 순서대로 정리. 점수를 매길 수 있는 모델이면 제로샷 분류기가 된다는 설명, 분류 사전학습이 "개를 한 덩어리로 뭉치는" 이유, few-shot 곡선이 먼저 내려가는 이유(시뮬레이션), "바나나는 노랗다". 구간별 영상 링크와 퀴즈 6문항
+
 데모 2·3은 8×8 픽셀 장난감 세계에서 도는 작은 모델이고, 실제 CLIP 가중치를 돌리지는 않습니다.
 
 ## 참고
